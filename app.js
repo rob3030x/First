@@ -135,9 +135,10 @@ function formatDate(dateStr) {
 }
 
 function formatAmount(amount, currency) {
-  const symbols = { MXN: '$', USD: '$', EUR: '€' };
+  const symbols = { MXN: '$', CLP: '$', USD: '$', EUR: '€' };
   const sym = symbols[currency] || '$';
-  return `${sym}${parseFloat(amount).toFixed(2)} ${currency}`;
+  const decimals = currency === 'CLP' ? 0 : 2;
+  return `${sym}${parseFloat(amount).toFixed(decimals)} ${currency}`;
 }
 
 function getStatus(bill) {
