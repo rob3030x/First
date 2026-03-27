@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cuentas por Pagar</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <header>
+    <h1>💳 Cuentas por Pagar</h1>
+    <p class="subtitle">Mantén el control de tus facturas y pagos</p>
+  </header>
+
+  <main>
+    <!-- Summary Cards -->
+    <section class="summary">
+      <div class="card card-overdue">
+        <span class="card-label">Vencidas</span>
+        <span class="card-amount" id="totalOverdue">$0.00</span>
+        <span class="card-count" id="countOverdue">0 cuentas</span>
+      </div>
+      <div class="card card-soon">
+        <span class="card-label">Próximas (7 días)</span>
+        <span class="card-amount" id="totalSoon">$0.00</span>
+        <span class="card-count" id="countSoon">0 cuentas</span>
+      </div>
+      <div class="card card-pending">
+        <span class="card-label">Pendientes totales</span>
+        <span class="card-amount" id="totalPending">$0.00</span>
+        <span class="card-count" id="countPending">0 cuentas</span>
+      </div>
+    </section>
+
+    <!-- Add Bill Button -->
+    <div class="toolbar">
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all">Todas</button>
+        <button class="filter-btn" data-filter="pending">Pendientes</button>
+        <button class="filter-btn" data-filter="paid">Pagadas</button>
+      </div>
+      <button class="btn-add" id="btnAdd">+ Agregar Cuenta</button>
+    </div>
+
+    <!-- Bills List -->
+    <section class="bills-list" id="billsList">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">📋</div>
+        <p>No tienes cuentas registradas.</p>
+        <p>Haz clic en "Agregar Cuenta" para comenzar.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: Add/Edit Bill -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">Agregar Cuenta</h2>
+        <button class="modal-close" id="modalClose">&times;</button>
+      </div>
+      <form id="billForm">
+        <input type="hidden" id="billId" />
+
+        <div class="form-group">
+          <label for="billName">Nombre de la cuenta *</label>
+          <input type="text" id="billName" placeholder="Ej: Renta, Luz, Internet..." required />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="billAmount">Monto *</label>
+            <input type="number" id="billAmount" placeholder="0.00" min="0" step="0.01" required />
+          </div>
+          <div class="form-group">
+            <label for="billCurrency">Moneda</label>
+            <select id="billCurrency">
+              <option value="MXN">MXN $</option>
+              <option value="USD">USD $</option>
+              <option value="EUR">EUR €</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="billDueDate">Fecha de vencimiento *</label>
+            <input type="date" id="billDueDate" required />
+          </div>
+          <div class="form-group">
+            <label for="billCategory">Categoría</label>
+            <select id="billCategory">
+              <option value="vivienda">🏠 Vivienda</option>
+              <option value="servicios">💡 Servicios</option>
+              <option value="transporte">🚗 Transporte</option>
+              <option value="salud">🏥 Salud</option>
+              <option value="entretenimiento">🎬 Entretenimiento</option>
+              <option value="educacion">📚 Educación</option>
+              <option value="seguro">🛡️ Seguro</option>
+              <option value="tarjeta">💳 Tarjeta de crédito</option>
+              <option value="otro">📦 Otro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="billFrequency">Frecuencia</label>
+          <select id="billFrequency">
+            <option value="once">Una vez</option>
+            <option value="monthly">Mensual</option>
+            <option value="bimonthly">Bimestral</option>
+            <option value="quarterly">Trimestral</option>
+            <option value="biannual">Semestral</option>
+            <option value="annual">Anual</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="billNotes">Notas</label>
+          <textarea id="billNotes" placeholder="Información adicional..." rows="2"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" id="btnCancel">Cancelar</button>
+          <button type="submit" class="btn-save">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
