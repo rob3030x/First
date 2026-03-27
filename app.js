@@ -457,6 +457,66 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
 });
 
+// ─── ICS Export ───────────────────────────────────────────────────────────────
+
+function exportICS() {
+  const unpaid = bills.filter(b => !b.paid);
+  if (unpaid.length === 0) {
+    alert('No hay cuentas pendientes para exportar.');
+    return;
+  }
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Cuentas por Pagar//ES',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+  ];
+
+  unpaid.forEach(bill => {
+    const [y, m, d] = bill.dueDate.split('-');
+    const dtDate = `${y}${m}${d}`;
+
+    // Next day for DTEND
+    const due = new Date(bill.dueDate + 'T00:00:00');
+    due.setDate(due.getDate() + 1);
+    const endDate = `${due.getFullYear()}${String(due.getMonth()+1).padStart(2,'0')}${String(due.getDate()).padStart(2,'0')}`;
+
+    const uid = `bill-${bill.id}@cuentas`;
+    const summary  = bill.name.replace(/[,;\\]/g, ' ');
+    const desc = `Monto: ${formatAmount(bill.amount, bill.currency)}${bill.notes ? ' | ' + bill.notes.replace(/[,;\\]/g, ' ') : ''}`;
+
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTAMP:${dtDate}T000000Z`,
+      `DTSTART;VALUE=DATE:${dtDate}`,
+      `DTEND;VALUE=DATE:${endDate}`,
+      `SUMMARY:💳 ${summary}`,
+      `DESCRIPTION:${desc}`,
+      'BEGIN:VALARM',
+      'TRIGGER:-P3D',
+      'ACTION:DISPLAY',
+      `DESCRIPTION:Vence en 3 días: ${summary}`,
+      'END:VALARM',
+      'END:VEVENT',
+    );
+  });
+
+  lines.push('END:VCALENDAR');
+
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'cuentas-por-pagar.ics';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('btnExportICS').addEventListener('click', exportICS);
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 load();
