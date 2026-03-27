@@ -230,6 +230,7 @@ function renderBills() {
   });
 
   updateSummary();
+  if (typeof currentView !== 'undefined' && currentView === 'cal') renderCalendar();
 }
 
 function updateSummary() {
@@ -326,6 +327,104 @@ function deleteBill(id) {
 }
 
 // ─── Event Listeners ──────────────────────────────────────────────────────────
+
+// ─── Calendar ─────────────────────────────────────────────────────────────────
+
+let calYear  = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function renderCalendar() {
+  const title = document.getElementById('calTitle');
+  const grid  = document.getElementById('calGrid');
+  title.textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
+  grid.innerHTML = '';
+
+  // Build a map: "YYYY-MM-DD" → [bill, ...]
+  const dayMap = {};
+  bills.forEach(bill => {
+    const key = bill.dueDate;
+    if (!dayMap[key]) dayMap[key] = [];
+    dayMap[key].push(bill);
+  });
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
+  const todayStr    = today();
+
+  // Previous month filler
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = daysInPrev - i;
+    const cell = document.createElement('div');
+    cell.className = 'cal-day other-month';
+    cell.innerHTML = `<div class="cal-day-num">${d}</div>`;
+    grid.appendChild(cell);
+  }
+
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
+    const mm = String(calMonth + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    const key = `${calYear}-${mm}-${dd}`;
+    const isToday = key === todayStr;
+
+    const cell = document.createElement('div');
+    cell.className = `cal-day${isToday ? ' is-today' : ''}`;
+    cell.innerHTML = `<div class="cal-day-num">${d}</div><div class="cal-dots"></div>`;
+
+    const dotsEl = cell.querySelector('.cal-dots');
+    if (dayMap[key]) {
+      dayMap[key].forEach(bill => {
+        const status = getStatus(bill);
+        const dot = document.createElement('div');
+        dot.className = `cal-dot ${status}`;
+        dot.title = `${bill.name} — ${formatAmount(bill.amount, bill.currency)}`;
+        dotsEl.appendChild(dot);
+      });
+    }
+    grid.appendChild(cell);
+  }
+
+  // Next month filler
+  const totalCells = firstDay + daysInMonth;
+  const remaining  = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let d = 1; d <= remaining; d++) {
+    const cell = document.createElement('div');
+    cell.className = 'cal-day other-month';
+    cell.innerHTML = `<div class="cal-day-num">${d}</div>`;
+    grid.appendChild(cell);
+  }
+}
+
+let currentView = 'list';
+
+function setView(view) {
+  currentView = view;
+  const isList = view === 'list';
+  document.getElementById('billsList').style.display    = isList ? '' : 'none';
+  document.getElementById('calendarView').style.display = isList ? 'none' : '';
+  document.getElementById('btnViewList').classList.toggle('active',  isList);
+  document.getElementById('btnViewCal').classList.toggle('active',  !isList);
+  if (!isList) renderCalendar();
+}
+
+document.getElementById('btnViewList').addEventListener('click', () => setView('list'));
+document.getElementById('btnViewCal').addEventListener('click',  () => setView('cal'));
+document.getElementById('calPrev').addEventListener('click', () => {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+});
+document.getElementById('calNext').addEventListener('click', () => {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+});
+
+// ─── Events ───────────────────────────────────────────────────────────────────
 
 document.getElementById('btnAdd').addEventListener('click', () => openModal());
 document.getElementById('modalClose').addEventListener('click', closeModal);

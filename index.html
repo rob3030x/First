@@ -65,14 +65,18 @@
       </div>
     </section>
 
-    <!-- Add Bill Button -->
+    <!-- Toolbar -->
     <div class="toolbar">
       <div class="filters">
         <button class="filter-btn active" data-filter="all">Todas</button>
         <button class="filter-btn" data-filter="pending">Pendientes</button>
         <button class="filter-btn" data-filter="paid">Pagadas</button>
       </div>
-      <button class="btn-add" id="btnAdd">+ Agregar Cuenta</button>
+      <div class="toolbar-right">
+        <button class="btn-view active" id="btnViewList" title="Lista">☰</button>
+        <button class="btn-view" id="btnViewCal" title="Calendario">📅</button>
+        <button class="btn-add" id="btnAdd">+ Agregar</button>
+      </div>
     </div>
 
     <!-- Bills List -->
@@ -80,7 +84,27 @@
       <div class="empty-state" id="emptyState">
         <div class="empty-icon">📋</div>
         <p>No tienes cuentas registradas.</p>
-        <p>Haz clic en "Agregar Cuenta" para comenzar.</p>
+        <p>Haz clic en "Agregar" para comenzar.</p>
+      </div>
+    </section>
+
+    <!-- Calendar View -->
+    <section class="calendar-view" id="calendarView" style="display:none">
+      <div class="cal-header">
+        <button class="cal-nav" id="calPrev">‹</button>
+        <span class="cal-title" id="calTitle"></span>
+        <button class="cal-nav" id="calNext">›</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>Dom</span><span>Lun</span><span>Mar</span>
+        <span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-legend">
+        <span class="leg-dot leg-overdue"></span>Vencida
+        <span class="leg-dot leg-soon"></span>Próxima
+        <span class="leg-dot leg-upcoming"></span>Pendiente
+        <span class="leg-dot leg-paid"></span>Pagada
       </div>
     </section>
   </main>
