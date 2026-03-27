@@ -1,5 +1,71 @@
 'use strict';
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+// SHA-256 hash of PIN "1234"
+const PIN_HASH = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
+const AUTH_KEY = 'bills_auth';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+let pinBuffer = '';
+
+function showLockScreen() {
+  pinBuffer = '';
+  updateDots();
+  document.getElementById('pinError').classList.remove('visible');
+  document.getElementById('lockScreen').classList.add('visible');
+}
+
+function hideLockScreen() {
+  sessionStorage.setItem(AUTH_KEY, '1');
+  document.getElementById('lockScreen').classList.remove('visible');
+}
+
+function updateDots() {
+  document.querySelectorAll('#pinDots span').forEach((dot, i) => {
+    dot.classList.toggle('filled', i < pinBuffer.length);
+  });
+}
+
+async function checkPin() {
+  const hash = await sha256(pinBuffer);
+  if (hash === PIN_HASH) {
+    hideLockScreen();
+  } else {
+    pinBuffer = '';
+    updateDots();
+    const err = document.getElementById('pinError');
+    err.classList.add('visible');
+    setTimeout(() => err.classList.remove('visible'), 2000);
+  }
+}
+
+document.getElementById('lockScreen').addEventListener('click', async e => {
+  const val = e.target.closest('.pin-key')?.dataset.val;
+  if (!val) return;
+  if (val === 'clear') {
+    pinBuffer = pinBuffer.slice(0, -1);
+    updateDots();
+  } else if (val === 'ok') {
+    if (pinBuffer.length > 0) await checkPin();
+  } else {
+    if (pinBuffer.length < 4) {
+      pinBuffer += val;
+      updateDots();
+      if (pinBuffer.length === 4) await checkPin();
+    }
+  }
+});
+
+document.getElementById('btnLock').addEventListener('click', () => {
+  sessionStorage.removeItem(AUTH_KEY);
+  showLockScreen();
+});
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'bills_tracker_v1';
@@ -295,3 +361,7 @@ document.addEventListener('keydown', e => {
 
 load();
 renderBills();
+
+if (!sessionStorage.getItem(AUTH_KEY)) {
+  showLockScreen();
+}

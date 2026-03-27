@@ -8,9 +8,41 @@
 </head>
 <body>
 
+  <!-- Lock Screen -->
+  <div class="lock-screen" id="lockScreen">
+    <div class="lock-box">
+      <div class="lock-icon">🔒</div>
+      <h2>Cuentas por Pagar</h2>
+      <p>Ingresa tu PIN para continuar</p>
+      <div class="pin-dots" id="pinDots">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="pin-error" id="pinError">PIN incorrecto</div>
+      <div class="pin-pad">
+        <button class="pin-key" data-val="1">1</button>
+        <button class="pin-key" data-val="2">2</button>
+        <button class="pin-key" data-val="3">3</button>
+        <button class="pin-key" data-val="4">4</button>
+        <button class="pin-key" data-val="5">5</button>
+        <button class="pin-key" data-val="6">6</button>
+        <button class="pin-key" data-val="7">7</button>
+        <button class="pin-key" data-val="8">8</button>
+        <button class="pin-key" data-val="9">9</button>
+        <button class="pin-key pin-clear" data-val="clear">⌫</button>
+        <button class="pin-key" data-val="0">0</button>
+        <button class="pin-key pin-ok" data-val="ok">OK</button>
+      </div>
+    </div>
+  </div>
+
   <header>
-    <h1>💳 Cuentas por Pagar</h1>
-    <p class="subtitle">Mantén el control de tus facturas y pagos</p>
+    <div class="header-inner">
+      <div>
+        <h1>💳 Cuentas por Pagar</h1>
+        <p class="subtitle">Mantén el control de tus facturas y pagos</p>
+      </div>
+      <button class="btn-lock" id="btnLock" title="Bloquear">🔒</button>
+    </div>
   </header>
 
   <main>

@@ -31,6 +31,87 @@ body {
   min-height: 100vh;
 }
 
+/* Lock Screen */
+.lock-screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+
+.lock-screen.visible { display: flex; }
+
+.lock-box {
+  text-align: center;
+  color: white;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.lock-icon { font-size: 3rem; margin-bottom: 12px; }
+
+.lock-box h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; }
+.lock-box > p { opacity: 0.8; font-size: 0.9rem; margin-bottom: 24px; }
+
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.pin-dots span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.6);
+  background: transparent;
+  transition: background .15s;
+}
+
+.pin-dots span.filled { background: white; border-color: white; }
+
+.pin-error {
+  color: #fca5a5;
+  font-size: 0.82rem;
+  height: 18px;
+  margin-bottom: 20px;
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+.pin-error.visible { opacity: 1; }
+
+.pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-width: 240px;
+  margin: 0 auto;
+}
+
+.pin-key {
+  padding: 16px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255,255,255,.15);
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.pin-key:hover  { background: rgba(255,255,255,.25); }
+.pin-key:active { background: rgba(255,255,255,.35); }
+.pin-clear { font-size: 1rem; }
+.pin-ok    { background: rgba(255,255,255,.3); }
+.pin-ok:hover { background: rgba(255,255,255,.45); }
+
 /* Header */
 header {
   background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
@@ -38,6 +119,27 @@ header {
   padding: 28px 24px 24px;
   text-align: center;
 }
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.btn-lock {
+  background: rgba(255,255,255,.15);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+
+.btn-lock:hover { background: rgba(255,255,255,.3); }
 
 header h1 {
   font-size: 1.8rem;
