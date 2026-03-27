@@ -1,0 +1,11 @@
+{
+  "name": "cuentas-por-pagar",
+  "version": "1.0.0",
+  "description": "Aplicación web para gestionar cuentas por pagar",
+  "scripts": {
+    "start": "npx http-server . -p 3000 -o",
+    "dev": "npx live-server --port=3000"
+  },
+  "keywords": ["bills", "tracker", "finanzas"],
+  "license": "MIT"
+}
