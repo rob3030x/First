@@ -8,13 +8,44 @@
 </head>
 <body>
 
+  <!-- Lock Screen -->
+  <div class="lock-screen" id="lockScreen">
+    <div class="lock-box">
+      <div class="lock-icon">🔒</div>
+      <h2>Cuentas por Pagar</h2>
+      <p>Ingresa tu PIN para continuar</p>
+      <div class="pin-dots" id="pinDots">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="pin-error" id="pinError">PIN incorrecto</div>
+      <div class="pin-pad">
+        <button class="pin-key" data-val="1">1</button>
+        <button class="pin-key" data-val="2">2</button>
+        <button class="pin-key" data-val="3">3</button>
+        <button class="pin-key" data-val="4">4</button>
+        <button class="pin-key" data-val="5">5</button>
+        <button class="pin-key" data-val="6">6</button>
+        <button class="pin-key" data-val="7">7</button>
+        <button class="pin-key" data-val="8">8</button>
+        <button class="pin-key" data-val="9">9</button>
+        <button class="pin-key pin-clear" data-val="clear">⌫</button>
+        <button class="pin-key" data-val="0">0</button>
+        <button class="pin-key pin-ok" data-val="ok">OK</button>
+      </div>
+    </div>
+  </div>
+
   <header>
-    <h1>💳 Cuentas por Pagar</h1>
-    <p class="subtitle">Mantén el control de tus facturas y pagos</p>
+    <div class="header-inner">
+      <div>
+        <h1>💳 Cuentas por Pagar</h1>
+        <p class="subtitle">Mantén el control de tus facturas y pagos</p>
+      </div>
+      <button class="btn-lock" id="btnLock" title="Bloquear">🔒</button>
+    </div>
   </header>
 
   <main>
-    <!-- Summary Cards -->
     <section class="summary">
       <div class="card card-overdue">
         <span class="card-label">Vencidas</span>
@@ -33,7 +64,6 @@
       </div>
     </section>
 
-    <!-- Add Bill Button -->
     <div class="toolbar">
       <div class="filters">
         <button class="filter-btn active" data-filter="all">Todas</button>
@@ -43,7 +73,6 @@
       <button class="btn-add" id="btnAdd">+ Agregar Cuenta</button>
     </div>
 
-    <!-- Bills List -->
     <section class="bills-list" id="billsList">
       <div class="empty-state" id="emptyState">
         <div class="empty-icon">📋</div>
@@ -53,7 +82,6 @@
     </section>
   </main>
 
-  <!-- Modal: Add/Edit Bill -->
   <div class="modal-overlay" id="modalOverlay">
     <div class="modal">
       <div class="modal-header">
@@ -62,12 +90,10 @@
       </div>
       <form id="billForm">
         <input type="hidden" id="billId" />
-
         <div class="form-group">
           <label for="billName">Nombre de la cuenta *</label>
           <input type="text" id="billName" placeholder="Ej: Renta, Luz, Internet..." required />
         </div>
-
         <div class="form-row">
           <div class="form-group">
             <label for="billAmount">Monto *</label>
@@ -82,7 +108,6 @@
             </select>
           </div>
         </div>
-
         <div class="form-row">
           <div class="form-group">
             <label for="billDueDate">Fecha de vencimiento *</label>
@@ -103,7 +128,6 @@
             </select>
           </div>
         </div>
-
         <div class="form-group">
           <label for="billFrequency">Frecuencia</label>
           <select id="billFrequency">
@@ -115,12 +139,10 @@
             <option value="annual">Anual</option>
           </select>
         </div>
-
         <div class="form-group">
           <label for="billNotes">Notas</label>
           <textarea id="billNotes" placeholder="Información adicional..." rows="2"></textarea>
         </div>
-
         <div class="modal-actions">
           <button type="button" class="btn-cancel" id="btnCancel">Cancelar</button>
           <button type="submit" class="btn-save">Guardar</button>

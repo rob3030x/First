@@ -1,5 +1,72 @@
 'use strict';
 
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+const PIN_HASH = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
+const AUTH_KEY = 'bills_auth';
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+let pinBuffer = '';
+
+function showLockScreen() {
+  pinBuffer = '';
+  updateDots();
+  document.getElementById('pinError').classList.remove('visible');
+  document.getElementById('lockScreen').classList.add('visible');
+}
+
+function hideLockScreen() {
+  sessionStorage.setItem(AUTH_KEY, '1');
+  document.getElementById('lockScreen').classList.remove('visible');
+}
+
+function updateDots() {
+  document.querySelectorAll('#pinDots span').forEach((dot, i) => {
+    dot.classList.toggle('filled', i < pinBuffer.length);
+  });
+}
+
+async function checkPin() {
+  const hash = await sha256(pinBuffer);
+  if (hash === PIN_HASH) {
+    hideLockScreen();
+  } else {
+    pinBuffer = '';
+    updateDots();
+    const err = document.getElementById('pinError');
+    err.classList.add('visible');
+    setTimeout(() => err.classList.remove('visible'), 2000);
+  }
+}
+
+document.getElementById('lockScreen').addEventListener('click', async e => {
+  const val = e.target.closest('.pin-key')?.dataset.val;
+  if (!val) return;
+  if (val === 'clear') {
+    pinBuffer = pinBuffer.slice(0, -1);
+    updateDots();
+  } else if (val === 'ok') {
+    if (pinBuffer.length > 0) await checkPin();
+  } else {
+    if (pinBuffer.length < 4) {
+      pinBuffer += val;
+      updateDots();
+      if (pinBuffer.length === 4) await checkPin();
+    }
+  }
+});
+
+document.getElementById('btnLock').addEventListener('click', () => {
+  sessionStorage.removeItem(AUTH_KEY);
+  showLockScreen();
+});
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const STORAGE_KEY = 'bills_tracker_v1';
 
 const CATEGORY_ICONS = {
@@ -157,15 +224,12 @@ function updateSummary() {
   const unpaid = bills.filter(b => !b.paid);
   const overdue = unpaid.filter(b => daysUntil(b.dueDate) < 0);
   const soon    = unpaid.filter(b => { const d = daysUntil(b.dueDate); return d >= 0 && d <= 7; });
-
   const sum = arr => arr.reduce((acc, b) => acc + parseFloat(b.amount), 0);
 
   document.getElementById('totalOverdue').textContent = `$${sum(overdue).toFixed(2)}`;
   document.getElementById('countOverdue').textContent = `${overdue.length} cuenta${overdue.length !== 1 ? 's' : ''}`;
-
   document.getElementById('totalSoon').textContent = `$${sum(soon).toFixed(2)}`;
   document.getElementById('countSoon').textContent = `${soon.length} cuenta${soon.length !== 1 ? 's' : ''}`;
-
   document.getElementById('totalPending').textContent = `$${sum(unpaid).toFixed(2)}`;
   document.getElementById('countPending').textContent = `${unpaid.length} cuenta${unpaid.length !== 1 ? 's' : ''}`;
 }
@@ -213,9 +277,7 @@ function saveBill(e) {
 
   if (editingId) {
     const idx = bills.findIndex(b => b.id === editingId);
-    if (idx !== -1) {
-      bills[idx] = { ...bills[idx], name, amount, currency, dueDate, category, frequency, notes };
-    }
+    if (idx !== -1) bills[idx] = { ...bills[idx], name, amount, currency, dueDate, category, frequency, notes };
   } else {
     bills.push({ id: uid(), name, amount, currency, dueDate, category, frequency, notes, paid: false, createdAt: new Date().toISOString() });
   }
@@ -275,3 +337,7 @@ document.addEventListener('keydown', e => {
 
 load();
 renderBills();
+
+if (!sessionStorage.getItem(AUTH_KEY)) {
+  showLockScreen();
+}
