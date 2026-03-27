@@ -1,7 +1,5 @@
 'use strict';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const STORAGE_KEY = 'bills_tracker_v1';
 
 const CATEGORY_ICONS = {
@@ -25,13 +23,9 @@ const FREQUENCY_LABELS = {
   annual:     'Anual',
 };
 
-// ─── State ───────────────────────────────────────────────────────────────────
-
 let bills = [];
 let currentFilter = 'all';
 let editingId = null;
-
-// ─── Storage ─────────────────────────────────────────────────────────────────
 
 function load() {
   try {
@@ -45,8 +39,6 @@ function load() {
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(bills));
 }
-
-// ─── Utilities ────────────────────────────────────────────────────────────────
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -91,8 +83,6 @@ function statusLabel(status) {
   }[status] || '';
 }
 
-// ─── Render ───────────────────────────────────────────────────────────────────
-
 function renderBills() {
   const list = document.getElementById('billsList');
   const empty = document.getElementById('emptyState');
@@ -103,7 +93,6 @@ function renderBills() {
     return true;
   });
 
-  // Sort: overdue → due-soon → upcoming (by date) → paid
   filtered.sort((a, b) => {
     const order = { overdue: 0, 'due-soon': 1, upcoming: 2, paid: 3 };
     const sa = getStatus(a), sb = getStatus(b);
@@ -111,7 +100,6 @@ function renderBills() {
     return a.dueDate.localeCompare(b.dueDate);
   });
 
-  // Remove existing bill items
   list.querySelectorAll('.bill-item').forEach(el => el.remove());
 
   if (filtered.length === 0) {
@@ -190,8 +178,6 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
-
 function openModal(bill = null) {
   editingId = bill ? bill.id : null;
   document.getElementById('modalTitle').textContent = bill ? 'Editar Cuenta' : 'Agregar Cuenta';
@@ -212,8 +198,6 @@ function closeModal() {
   document.getElementById('billForm').reset();
   editingId = null;
 }
-
-// ─── Actions ──────────────────────────────────────────────────────────────────
 
 function saveBill(e) {
   e.preventDefault();
@@ -258,8 +242,6 @@ function deleteBill(id) {
   renderBills();
 }
 
-// ─── Event Listeners ──────────────────────────────────────────────────────────
-
 document.getElementById('btnAdd').addEventListener('click', () => openModal());
 document.getElementById('modalClose').addEventListener('click', closeModal);
 document.getElementById('btnCancel').addEventListener('click', closeModal);
@@ -290,8 +272,6 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
 });
-
-// ─── Init ─────────────────────────────────────────────────────────────────────
 
 load();
 renderBills();
