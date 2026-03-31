@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cuentas por Pagar</title>
+  <title>Gestión de Gastos y Cuentas</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -12,7 +12,7 @@
   <div class="lock-screen" id="lockScreen">
     <div class="lock-box">
       <div class="lock-icon">🔒</div>
-      <h2>Cuentas por Pagar</h2>
+      <h2>Gestión de Gastos</h2>
       <p>Ingresa tu PIN para continuar</p>
       <div class="pin-dots" id="pinDots">
         <span></span><span></span><span></span><span></span>
@@ -37,150 +37,246 @@
 
   <header>
     <div class="header-inner">
-      <div>
-        <h1>💳 Cuentas por Pagar</h1>
-        <p class="subtitle">Mantén el control de tus facturas y pagos</p>
+      <div class="header-title">
+        <h1>💳 Gestión de Gastos</h1>
+        <p class="subtitle">Control de cuentas y pagos</p>
       </div>
       <button class="btn-lock" id="btnLock" title="Bloquear">🔒</button>
     </div>
+    <nav class="tabs" id="mainTabs">
+      <button class="tab-btn active" data-tab="resumen">📊 Resumen</button>
+      <button class="tab-btn" data-tab="cuentas">🗂️ Cuentas</button>
+      <button class="tab-btn" data-tab="pagos">💰 Pagos</button>
+      <button class="tab-btn" data-tab="categorias">🏷️ Categorías</button>
+    </nav>
   </header>
 
   <main>
-    <!-- Summary Cards -->
-    <section class="summary">
-      <div class="card card-overdue">
-        <span class="card-label">Vencidas</span>
-        <span class="card-amount" id="totalOverdue">$0.00</span>
-        <span class="card-count" id="countOverdue">0 cuentas</span>
+
+    <!-- ─── RESUMEN ──────────────────────────────────────────────────────── -->
+    <section class="tab-panel active" id="tab-resumen">
+      <div class="summary-grid">
+        <div class="scard scard-paid">
+          <span class="scard-label">Pagado este mes</span>
+          <span class="scard-amount" id="sumPaidMonth">$0</span>
+          <span class="scard-sub"   id="sumPaidCount">0 pagos</span>
+        </div>
+        <div class="scard scard-pending">
+          <span class="scard-label">Pendiente</span>
+          <span class="scard-amount" id="sumPending">$0</span>
+          <span class="scard-sub"   id="sumPendingCount">0 pagos</span>
+        </div>
+        <div class="scard scard-overdue">
+          <span class="scard-label">Vencido</span>
+          <span class="scard-amount" id="sumOverdue">$0</span>
+          <span class="scard-sub"   id="sumOverdueCount">0 pagos</span>
+        </div>
       </div>
-      <div class="card card-soon">
-        <span class="card-label">Próximas (7 días)</span>
-        <span class="card-amount" id="totalSoon">$0.00</span>
-        <span class="card-count" id="countSoon">0 cuentas</span>
+
+      <div class="panel-section">
+        <div class="section-header">
+          <h2>Próximas a vencer</h2>
+          <span class="section-hint">Cuentas activas ordenadas por día de vencimiento</span>
+        </div>
+        <div id="upcomingList" class="item-list"></div>
       </div>
-      <div class="card card-pending">
-        <span class="card-label">Pendientes totales</span>
-        <span class="card-amount" id="totalPending">$0.00</span>
-        <span class="card-count" id="countPending">0 cuentas</span>
+
+      <div class="panel-section">
+        <div class="section-header">
+          <h2>Últimos pagos</h2>
+        </div>
+        <div id="recentPayments" class="item-list"></div>
       </div>
     </section>
 
-    <!-- Toolbar -->
-    <div class="toolbar">
-      <div class="filters">
-        <button class="filter-btn active" data-filter="all">Todas</button>
-        <button class="filter-btn" data-filter="pending">Pendientes</button>
-        <button class="filter-btn" data-filter="paid">Pagadas</button>
+    <!-- ─── CUENTAS ───────────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-cuentas">
+      <div class="toolbar">
+        <input type="search" class="search-input" id="searchCuentas" placeholder="Buscar cuenta…" />
+        <div class="toolbar-right">
+          <label class="toggle-label">
+            <input type="checkbox" id="showInactive" /> Mostrar inactivas
+          </label>
+          <button class="btn-primary" id="btnNewCuenta">+ Nueva Cuenta</button>
+        </div>
       </div>
-      <div class="toolbar-right">
-        <button class="btn-view active" id="btnViewList" title="Lista">☰</button>
-        <button class="btn-view" id="btnViewCal" title="Calendario">📅</button>
-        <button class="btn-view" id="btnExportICS" title="Exportar a Calendario">🗓️</button>
-        <button class="btn-add" id="btnAdd">+ Agregar</button>
-      </div>
-    </div>
-
-    <!-- Bills List -->
-    <section class="bills-list" id="billsList">
-      <div class="empty-state" id="emptyState">
-        <div class="empty-icon">📋</div>
-        <p>No tienes cuentas registradas.</p>
-        <p>Haz clic en "Agregar" para comenzar.</p>
-      </div>
+      <div id="cuentasList" class="item-list"></div>
     </section>
 
-    <!-- Calendar View -->
-    <section class="calendar-view" id="calendarView" style="display:none">
-      <div class="cal-header">
-        <button class="cal-nav" id="calPrev">‹</button>
-        <span class="cal-title" id="calTitle"></span>
-        <button class="cal-nav" id="calNext">›</button>
+    <!-- ─── PAGOS ─────────────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-pagos">
+      <div class="toolbar">
+        <div class="filters">
+          <button class="filter-btn active" data-filter="all">Todos</button>
+          <button class="filter-btn" data-filter="pagado">Pagados</button>
+          <button class="filter-btn" data-filter="pendiente">Pendientes</button>
+          <button class="filter-btn" data-filter="vencido">Vencidos</button>
+        </div>
+        <div class="toolbar-right">
+          <input type="month" id="filterMonth" class="month-input" />
+          <button class="btn-primary" id="btnNewPago">+ Nuevo Pago</button>
+        </div>
       </div>
-      <div class="cal-weekdays">
-        <span>Dom</span><span>Lun</span><span>Mar</span>
-        <span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span>
-      </div>
-      <div class="cal-grid" id="calGrid"></div>
-      <div class="cal-legend">
-        <span class="leg-dot leg-overdue"></span>Vencida
-        <span class="leg-dot leg-soon"></span>Próxima
-        <span class="leg-dot leg-upcoming"></span>Pendiente
-        <span class="leg-dot leg-paid"></span>Pagada
-      </div>
+      <div id="pagosList" class="item-list"></div>
     </section>
+
+    <!-- ─── CATEGORÍAS ────────────────────────────────────────────────────── -->
+    <section class="tab-panel" id="tab-categorias">
+      <div class="toolbar">
+        <span class="section-hint">Organiza tus cuentas por categoría</span>
+        <button class="btn-primary" id="btnNewCat">+ Nueva Categoría</button>
+      </div>
+      <div id="catGrid" class="cat-grid"></div>
+    </section>
+
   </main>
 
-  <!-- Modal: Add/Edit Bill -->
-  <div class="modal-overlay" id="modalOverlay">
+  <!-- ─── MODAL: CUENTA ─────────────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="modalCuenta">
     <div class="modal">
       <div class="modal-header">
-        <h2 id="modalTitle">Agregar Cuenta</h2>
-        <button class="modal-close" id="modalClose">&times;</button>
+        <h2 id="modalCuentaTitle">Nueva Cuenta</h2>
+        <button class="modal-close" data-close="modalCuenta">&times;</button>
       </div>
-      <form id="billForm">
-        <input type="hidden" id="billId" />
-
+      <form id="formCuenta">
+        <input type="hidden" id="cuentaId" />
         <div class="form-group">
-          <label for="billName">Nombre de la cuenta *</label>
-          <input type="text" id="billName" placeholder="Ej: Renta, Luz, Internet..." required />
+          <label for="cuentaNombre">Nombre *</label>
+          <input type="text" id="cuentaNombre" placeholder="Ej: Arriendo, Internet, Luz…" required />
         </div>
-
         <div class="form-row">
           <div class="form-group">
-            <label for="billAmount">Monto *</label>
-            <input type="number" id="billAmount" placeholder="0.00" min="0" step="0.01" required />
+            <label for="cuentaCategoria">Categoría</label>
+            <select id="cuentaCategoria"></select>
           </div>
           <div class="form-group">
-            <label for="billCurrency">Moneda</label>
-            <select id="billCurrency">
-              <option value="MXN">MXN $</option>
-              <option value="CLP">CLP $</option>
-              <option value="USD">USD $</option>
-              <option value="EUR">EUR €</option>
+            <label for="cuentaFrecuencia">Frecuencia</label>
+            <select id="cuentaFrecuencia">
+              <option value="mensual">Mensual</option>
+              <option value="bimestral">Bimestral</option>
+              <option value="trimestral">Trimestral</option>
+              <option value="anual">Anual</option>
             </select>
           </div>
         </div>
-
         <div class="form-row">
           <div class="form-group">
-            <label for="billDueDate">Fecha de vencimiento *</label>
-            <input type="date" id="billDueDate" required />
+            <label for="cuentaMonto">Monto estimado</label>
+            <input type="number" id="cuentaMonto" placeholder="0" min="0" step="1" />
           </div>
           <div class="form-group">
-            <label for="billCategory">Categoría</label>
-            <select id="billCategory">
-              <option value="vivienda">🏠 Vivienda</option>
-              <option value="servicios">💡 Servicios</option>
-              <option value="transporte">🚗 Transporte</option>
-              <option value="salud">🏥 Salud</option>
-              <option value="entretenimiento">🎬 Entretenimiento</option>
-              <option value="educacion">📚 Educación</option>
-              <option value="seguro">🛡️ Seguro</option>
-              <option value="tarjeta">💳 Tarjeta de crédito</option>
-              <option value="otro">📦 Otro</option>
-            </select>
+            <label for="cuentaDia">Día de vencimiento</label>
+            <input type="number" id="cuentaDia" placeholder="1–31" min="1" max="31" />
           </div>
         </div>
-
         <div class="form-group">
-          <label for="billFrequency">Frecuencia</label>
-          <select id="billFrequency">
-            <option value="once">Una vez</option>
-            <option value="monthly">Mensual</option>
-            <option value="bimonthly">Bimestral</option>
-            <option value="quarterly">Trimestral</option>
-            <option value="biannual">Semestral</option>
-            <option value="annual">Anual</option>
-          </select>
+          <label for="cuentaNotas">Notas</label>
+          <textarea id="cuentaNotas" rows="2" placeholder="Información adicional…"></textarea>
         </div>
-
         <div class="form-group">
-          <label for="billNotes">Notas</label>
-          <textarea id="billNotes" placeholder="Información adicional..." rows="2"></textarea>
+          <label class="check-label">
+            <input type="checkbox" id="cuentaActiva" checked /> Cuenta activa
+          </label>
         </div>
-
         <div class="modal-actions">
-          <button type="button" class="btn-cancel" id="btnCancel">Cancelar</button>
+          <button type="button" class="btn-cancel" data-close="modalCuenta">Cancelar</button>
+          <button type="submit" class="btn-save">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── MODAL: PAGO ───────────────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="modalPago">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalPagoTitle">Nuevo Pago</h2>
+        <button class="modal-close" data-close="modalPago">&times;</button>
+      </div>
+      <form id="formPago">
+        <input type="hidden" id="pagoId" />
+        <div class="form-group">
+          <label for="pagoCuenta">Cuenta *</label>
+          <select id="pagoCuenta" required></select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pagoMonto">Monto pagado *</label>
+            <input type="number" id="pagoMonto" placeholder="0" min="0" step="1" required />
+          </div>
+          <div class="form-group">
+            <label for="pagoMetodo">Método de pago</label>
+            <select id="pagoMetodo">
+              <option value="transferencia">Transferencia</option>
+              <option value="débito">Débito</option>
+              <option value="crédito">Crédito</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pagoFecha">Fecha de pago *</label>
+            <input type="date" id="pagoFecha" required />
+          </div>
+          <div class="form-group">
+            <label for="pagoVence">Fecha de vencimiento</label>
+            <input type="date" id="pagoVence" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pagoEstado">Estado</label>
+            <select id="pagoEstado">
+              <option value="pagado">Pagado</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="vencido">Vencido</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="pagoComprobante">Comprobante / Referencia</label>
+            <input type="text" id="pagoComprobante" placeholder="N° o referencia…" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="pagoNotas">Notas</label>
+          <textarea id="pagoNotas" rows="2" placeholder="Información adicional…"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" data-close="modalPago">Cancelar</button>
+          <button type="submit" class="btn-save">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─── MODAL: CATEGORÍA ──────────────────────────────────────────────────── -->
+  <div class="modal-overlay" id="modalCat">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 id="modalCatTitle">Nueva Categoría</h2>
+        <button class="modal-close" data-close="modalCat">&times;</button>
+      </div>
+      <form id="formCat">
+        <input type="hidden" id="catId" />
+        <div class="form-group">
+          <label for="catNombre">Nombre *</label>
+          <input type="text" id="catNombre" placeholder="Ej: Vivienda, Servicios…" required />
+        </div>
+        <div class="form-group">
+          <label for="catDesc">Descripción</label>
+          <input type="text" id="catDesc" placeholder="Descripción breve…" />
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <div class="color-row">
+            <input type="color" id="catColor" value="#3b82f6" />
+            <div class="color-swatches" id="colorSwatches"></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" data-close="modalCat">Cancelar</button>
           <button type="submit" class="btn-save">Guardar</button>
         </div>
       </form>

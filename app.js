@@ -2,7 +2,6 @@
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-// SHA-256 hash of PIN "1234"
 const PIN_HASH = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
 const AUTH_KEY = 'bills_auth';
 
@@ -66,50 +65,64 @@ document.getElementById('btnLock').addEventListener('click', () => {
   showLockScreen();
 });
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Storage keys ─────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'bills_tracker_v1';
-
-const CATEGORY_ICONS = {
-  vivienda:       '🏠',
-  servicios:      '💡',
-  transporte:     '🚗',
-  salud:          '🏥',
-  entretenimiento:'🎬',
-  educacion:      '📚',
-  seguro:         '🛡️',
-  tarjeta:        '💳',
-  otro:           '📦',
+const SK = {
+  cats:    'gastos_categorias',
+  cuentas: 'gastos_cuentas',
+  pagos:   'gastos_pagos',
 };
 
-const FREQUENCY_LABELS = {
-  once:       'Una vez',
-  monthly:    'Mensual',
-  bimonthly:  'Bimestral',
-  quarterly:  'Trimestral',
-  biannual:   'Semestral',
-  annual:     'Anual',
-};
+// ─── State ────────────────────────────────────────────────────────────────────
 
-// ─── State ───────────────────────────────────────────────────────────────────
+let cats    = [];
+let cuentas = [];
+let pagos   = [];
 
-let bills = [];
-let currentFilter = 'all';
-let editingId = null;
+let currentTab      = 'resumen';
+let pagosFilter     = 'all';
+let editingCuentaId = null;
+let editingPagoId   = null;
+let editingCatId    = null;
 
-// ─── Storage ─────────────────────────────────────────────────────────────────
+// ─── Default categories ───────────────────────────────────────────────────────
 
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    bills = raw ? JSON.parse(raw) : [];
-  } catch {
-    bills = [];
-  }
+const DEFAULT_CATS = [
+  { nombre: 'Vivienda',        descripcion: 'Arriendo, gastos comunes',      color: '#3b82f6' },
+  { nombre: 'Servicios',       descripcion: 'Luz, agua, gas, internet',      color: '#f59e0b' },
+  { nombre: 'Transporte',      descripcion: 'Combustible, TAG, movilización', color: '#10b981' },
+  { nombre: 'Salud',           descripcion: 'Médicos, medicamentos, isapre',  color: '#ef4444' },
+  { nombre: 'Entretenimiento', descripcion: 'Streaming, salidas',             color: '#8b5cf6' },
+  { nombre: 'Educación',       descripcion: 'Colegiaturas, cursos',           color: '#06b6d4' },
+  { nombre: 'Seguros',         descripcion: 'Seguro de vida, hogar, auto',    color: '#6366f1' },
+  { nombre: 'Tarjetas',        descripcion: 'Tarjetas de crédito',            color: '#ec4899' },
+  { nombre: 'Otro',            descripcion: 'Otros gastos',                   color: '#6b7280' },
+];
+
+const COLOR_SWATCHES = [
+  '#ef4444','#f59e0b','#10b981','#3b82f6',
+  '#8b5cf6','#ec4899','#06b6d4','#6366f1',
+  '#84cc16','#6b7280',
+];
+
+function seedCats() {
+  cats = DEFAULT_CATS.map(c => ({ ...c, id: uid(), creado_en: new Date().toISOString() }));
+  localStorage.setItem(SK.cats, JSON.stringify(cats));
 }
 
-function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(bills));
+// ─── Load / Save ──────────────────────────────────────────────────────────────
+
+function loadAll() {
+  try { cats    = JSON.parse(localStorage.getItem(SK.cats))    || []; } catch { cats    = []; }
+  try { cuentas = JSON.parse(localStorage.getItem(SK.cuentas)) || []; } catch { cuentas = []; }
+  try { pagos   = JSON.parse(localStorage.getItem(SK.pagos))   || []; } catch { pagos   = []; }
+  if (cats.length === 0) seedCats();
+}
+
+function saveAll() {
+  localStorage.setItem(SK.cats,    JSON.stringify(cats));
+  localStorage.setItem(SK.cuentas, JSON.stringify(cuentas));
+  localStorage.setItem(SK.pagos,   JSON.stringify(pagos));
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -122,405 +135,515 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function daysUntil(dateStr) {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const due = new Date(dateStr + 'T00:00:00');
-  return Math.round((due - now) / 86400000);
-}
-
-function formatDate(dateStr) {
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}/${y}`;
-}
-
-function formatAmount(amount, currency) {
-  const symbols = { MXN: '$', CLP: '$', USD: '$', EUR: '€' };
-  const sym = symbols[currency] || '$';
-  const decimals = currency === 'CLP' ? 0 : 2;
-  return `${sym}${parseFloat(amount).toFixed(decimals)} ${currency}`;
-}
-
-function getStatus(bill) {
-  if (bill.paid) return 'paid';
-  const days = daysUntil(bill.dueDate);
-  if (days < 0)  return 'overdue';
-  if (days <= 7) return 'due-soon';
-  return 'upcoming';
-}
-
-function statusLabel(status) {
-  return {
-    overdue:  'Vencida',
-    'due-soon':'Próxima',
-    upcoming: 'Pendiente',
-    paid:     'Pagada',
-  }[status] || '';
-}
-
-// ─── Render ───────────────────────────────────────────────────────────────────
-
-function renderBills() {
-  const list = document.getElementById('billsList');
-  const empty = document.getElementById('emptyState');
-
-  let filtered = bills.filter(b => {
-    if (currentFilter === 'paid')    return b.paid;
-    if (currentFilter === 'pending') return !b.paid;
-    return true;
-  });
-
-  // Sort: overdue → due-soon → upcoming (by date) → paid
-  filtered.sort((a, b) => {
-    const order = { overdue: 0, 'due-soon': 1, upcoming: 2, paid: 3 };
-    const sa = getStatus(a), sb = getStatus(b);
-    if (order[sa] !== order[sb]) return order[sa] - order[sb];
-    return a.dueDate.localeCompare(b.dueDate);
-  });
-
-  // Remove existing bill items
-  list.querySelectorAll('.bill-item').forEach(el => el.remove());
-
-  if (filtered.length === 0) {
-    empty.style.display = '';
-    updateSummary();
-    return;
-  }
-
-  empty.style.display = 'none';
-
-  filtered.forEach(bill => {
-    const status = getStatus(bill);
-    const days   = daysUntil(bill.dueDate);
-    const icon   = CATEGORY_ICONS[bill.category] || '📦';
-
-    let daysText;
-    if (status === 'paid')    daysText = 'Pagada';
-    else if (days < 0)        daysText = `Venció hace ${Math.abs(days)} día${Math.abs(days) !== 1 ? 's' : ''}`;
-    else if (days === 0)      daysText = 'Vence hoy';
-    else                      daysText = `Vence en ${days} día${days !== 1 ? 's' : ''}`;
-
-    const item = document.createElement('div');
-    item.className = `bill-item ${status}${bill.paid ? ' bill-paid' : ''}`;
-    item.dataset.id = bill.id;
-
-    item.innerHTML = `
-      <div class="bill-icon">${icon}</div>
-      <div class="bill-info">
-        <div class="bill-name">${escHtml(bill.name)}</div>
-        <div class="bill-meta">
-          <span>📅 ${formatDate(bill.dueDate)}</span>
-          <span>${daysText}</span>
-          <span class="bill-badge badge-${status}">${statusLabel(status)}</span>
-          ${bill.frequency !== 'once' ? `<span>🔄 ${FREQUENCY_LABELS[bill.frequency]}</span>` : ''}
-        </div>
-        ${bill.notes ? `<div class="bill-meta"><span>📝 ${escHtml(bill.notes)}</span></div>` : ''}
-      </div>
-      <div class="bill-amount">${formatAmount(bill.amount, bill.currency)}</div>
-      <div class="bill-actions">
-        ${!bill.paid
-          ? `<button class="btn-icon btn-pay" title="Marcar como pagada" data-id="${bill.id}">✅</button>`
-          : `<button class="btn-icon btn-pay" title="Marcar como pendiente" data-id="${bill.id}">↩️</button>`}
-        <button class="btn-icon btn-edit" title="Editar" data-id="${bill.id}">✏️</button>
-        <button class="btn-icon btn-del"  title="Eliminar" data-id="${bill.id}">🗑️</button>
-      </div>
-    `;
-
-    list.appendChild(item);
-  });
-
-  updateSummary();
-  if (typeof currentView !== 'undefined' && currentView === 'cal') renderCalendar();
-}
-
-function updateSummary() {
-  const unpaid = bills.filter(b => !b.paid);
-  const overdue = unpaid.filter(b => daysUntil(b.dueDate) < 0);
-  const soon    = unpaid.filter(b => { const d = daysUntil(b.dueDate); return d >= 0 && d <= 7; });
-
-  const sum = arr => arr.reduce((acc, b) => acc + parseFloat(b.amount), 0);
-
-  document.getElementById('totalOverdue').textContent = `$${sum(overdue).toFixed(2)}`;
-  document.getElementById('countOverdue').textContent = `${overdue.length} cuenta${overdue.length !== 1 ? 's' : ''}`;
-
-  document.getElementById('totalSoon').textContent = `$${sum(soon).toFixed(2)}`;
-  document.getElementById('countSoon').textContent = `${soon.length} cuenta${soon.length !== 1 ? 's' : ''}`;
-
-  document.getElementById('totalPending').textContent = `$${sum(unpaid).toFixed(2)}`;
-  document.getElementById('countPending').textContent = `${unpaid.length} cuenta${unpaid.length !== 1 ? 's' : ''}`;
+function currentMonth() {
+  return new Date().toISOString().slice(0, 7);
 }
 
 function escHtml(str) {
-  return String(str)
+  return String(str ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
 
-// ─── Modal ────────────────────────────────────────────────────────────────────
-
-function openModal(bill = null) {
-  editingId = bill ? bill.id : null;
-  document.getElementById('modalTitle').textContent = bill ? 'Editar Cuenta' : 'Agregar Cuenta';
-  document.getElementById('billId').value       = bill ? bill.id : '';
-  document.getElementById('billName').value     = bill ? bill.name : '';
-  document.getElementById('billAmount').value   = bill ? bill.amount : '';
-  document.getElementById('billCurrency').value = bill ? bill.currency : 'MXN';
-  document.getElementById('billDueDate').value  = bill ? bill.dueDate : today();
-  document.getElementById('billCategory').value = bill ? bill.category : 'servicios';
-  document.getElementById('billFrequency').value= bill ? bill.frequency : 'monthly';
-  document.getElementById('billNotes').value    = bill ? bill.notes : '';
-  document.getElementById('modalOverlay').classList.add('open');
-  document.getElementById('billName').focus();
+function formatMoney(n) {
+  const num = parseFloat(n);
+  if (isNaN(num)) return '—';
+  return '$' + num.toLocaleString('es-CL');
 }
 
-function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
-  document.getElementById('billForm').reset();
-  editingId = null;
+function formatDate(str) {
+  if (!str) return '—';
+  const [y, m, d] = str.split('-');
+  return `${d}/${m}/${y}`;
 }
 
-// ─── Actions ──────────────────────────────────────────────────────────────────
+function getCuenta(id) { return cuentas.find(c => c.id === id); }
+function getCat(id)    { return cats.find(c => c.id === id); }
 
-function saveBill(e) {
-  e.preventDefault();
-  const name      = document.getElementById('billName').value.trim();
-  const amount    = parseFloat(document.getElementById('billAmount').value);
-  const currency  = document.getElementById('billCurrency').value;
-  const dueDate   = document.getElementById('billDueDate').value;
-  const category  = document.getElementById('billCategory').value;
-  const frequency = document.getElementById('billFrequency').value;
-  const notes     = document.getElementById('billNotes').value.trim();
+function estadoBadge(estado) {
+  const map = { pagado: 'badge-paid', pendiente: 'badge-pending', vencido: 'badge-overdue' };
+  const labels = { pagado: 'Pagado', pendiente: 'Pendiente', vencido: 'Vencido' };
+  return `<span class="badge ${map[estado] || 'badge-pending'}">${labels[estado] || estado}</span>`;
+}
 
-  if (!name || isNaN(amount) || !dueDate) return;
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
 
-  if (editingId) {
-    const idx = bills.findIndex(b => b.id === editingId);
-    if (idx !== -1) {
-      bills[idx] = { ...bills[idx], name, amount, currency, dueDate, category, frequency, notes };
-    }
+function setTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${tab}`));
+  renderTab(tab);
+}
+
+function renderTab(tab) {
+  if (tab === 'resumen')    renderResumen();
+  if (tab === 'cuentas')    renderCuentas();
+  if (tab === 'pagos')      renderPagos();
+  if (tab === 'categorias') renderCategorias();
+}
+
+document.getElementById('mainTabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (btn) setTab(btn.dataset.tab);
+});
+
+// ─── Resumen ──────────────────────────────────────────────────────────────────
+
+function renderResumen() {
+  const month = currentMonth();
+
+  const paidMonth  = pagos.filter(p => p.estado === 'pagado'    && p.fecha_pago?.startsWith(month));
+  const pendientes = pagos.filter(p => p.estado === 'pendiente');
+  const vencidos   = pagos.filter(p => p.estado === 'vencido');
+
+  const sum = arr => arr.reduce((s, p) => s + (parseFloat(p.monto_pagado) || 0), 0);
+
+  document.getElementById('sumPaidMonth').textContent    = formatMoney(sum(paidMonth));
+  document.getElementById('sumPaidCount').textContent    = `${paidMonth.length} pago${paidMonth.length !== 1 ? 's' : ''}`;
+  document.getElementById('sumPending').textContent      = formatMoney(sum(pendientes));
+  document.getElementById('sumPendingCount').textContent = `${pendientes.length} pago${pendientes.length !== 1 ? 's' : ''}`;
+  document.getElementById('sumOverdue').textContent      = formatMoney(sum(vencidos));
+  document.getElementById('sumOverdueCount').textContent = `${vencidos.length} pago${vencidos.length !== 1 ? 's' : ''}`;
+
+  // Upcoming accounts
+  const activeCuentas = cuentas
+    .filter(c => c.activa)
+    .sort((a, b) => (a.dia_vencimiento || 99) - (b.dia_vencimiento || 99));
+
+  const upcomingEl = document.getElementById('upcomingList');
+  if (activeCuentas.length === 0) {
+    upcomingEl.innerHTML = emptyState('📋', 'No hay cuentas activas.', 'Agrega una en la pestaña Cuentas.');
   } else {
-    bills.push({ id: uid(), name, amount, currency, dueDate, category, frequency, notes, paid: false, createdAt: new Date().toISOString() });
+    upcomingEl.innerHTML = activeCuentas.slice(0, 6).map(c => {
+      const cat   = getCat(c.categoria_id);
+      const color = cat?.color ?? '#6b7280';
+      return `
+        <div class="list-item">
+          <div class="list-dot" style="background:${color}"></div>
+          <div class="list-info">
+            <span class="list-name">${escHtml(c.nombre)}</span>
+            <span class="list-sub">
+              ${cat ? escHtml(cat.nombre) : 'Sin categoría'} ·
+              Día ${c.dia_vencimiento ?? '?'} · ${c.frecuencia}
+            </span>
+          </div>
+          <div class="list-amount">${formatMoney(c.monto_estimado)}</div>
+          <button class="btn-sm" data-pay-cuenta="${c.id}">+ Pago</button>
+        </div>`;
+    }).join('');
   }
 
-  save();
-  closeModal();
-  renderBills();
-}
+  // Recent payments
+  const last = [...pagos]
+    .sort((a, b) => (b.fecha_pago || '').localeCompare(a.fecha_pago || ''))
+    .slice(0, 6);
 
-function togglePaid(id) {
-  const bill = bills.find(b => b.id === id);
-  if (!bill) return;
-  bill.paid = !bill.paid;
-  if (bill.paid) bill.paidAt = new Date().toISOString();
-  else delete bill.paidAt;
-  save();
-  renderBills();
-}
-
-function deleteBill(id) {
-  if (!confirm('¿Eliminar esta cuenta?')) return;
-  bills = bills.filter(b => b.id !== id);
-  save();
-  renderBills();
-}
-
-// ─── Event Listeners ──────────────────────────────────────────────────────────
-
-// ─── Calendar ─────────────────────────────────────────────────────────────────
-
-let calYear  = new Date().getFullYear();
-let calMonth = new Date().getMonth();
-
-const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                     'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-
-function renderCalendar() {
-  const title = document.getElementById('calTitle');
-  const grid  = document.getElementById('calGrid');
-  title.textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
-  grid.innerHTML = '';
-
-  // Build a map: "YYYY-MM-DD" → [bill, ...]
-  const dayMap = {};
-  bills.forEach(bill => {
-    const key = bill.dueDate;
-    if (!dayMap[key]) dayMap[key] = [];
-    dayMap[key].push(bill);
-  });
-
-  const firstDay = new Date(calYear, calMonth, 1).getDay();
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
-  const todayStr    = today();
-
-  // Previous month filler
-  for (let i = firstDay - 1; i >= 0; i--) {
-    const d = daysInPrev - i;
-    const cell = document.createElement('div');
-    cell.className = 'cal-day other-month';
-    cell.innerHTML = `<div class="cal-day-num">${d}</div>`;
-    grid.appendChild(cell);
-  }
-
-  // Current month days
-  for (let d = 1; d <= daysInMonth; d++) {
-    const mm = String(calMonth + 1).padStart(2, '0');
-    const dd = String(d).padStart(2, '0');
-    const key = `${calYear}-${mm}-${dd}`;
-    const isToday = key === todayStr;
-
-    const cell = document.createElement('div');
-    cell.className = `cal-day${isToday ? ' is-today' : ''}`;
-    cell.innerHTML = `<div class="cal-day-num">${d}</div><div class="cal-dots"></div>`;
-
-    const dotsEl = cell.querySelector('.cal-dots');
-    if (dayMap[key]) {
-      dayMap[key].forEach(bill => {
-        const status = getStatus(bill);
-        const dot = document.createElement('div');
-        dot.className = `cal-dot ${status}`;
-        dot.title = `${bill.name} — ${formatAmount(bill.amount, bill.currency)}`;
-        dotsEl.appendChild(dot);
-      });
-    }
-    grid.appendChild(cell);
-  }
-
-  // Next month filler
-  const totalCells = firstDay + daysInMonth;
-  const remaining  = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
-  for (let d = 1; d <= remaining; d++) {
-    const cell = document.createElement('div');
-    cell.className = 'cal-day other-month';
-    cell.innerHTML = `<div class="cal-day-num">${d}</div>`;
-    grid.appendChild(cell);
+  const recentEl = document.getElementById('recentPayments');
+  if (last.length === 0) {
+    recentEl.innerHTML = emptyState('💳', 'No hay pagos registrados.', 'Registra el primero en la pestaña Pagos.');
+  } else {
+    recentEl.innerHTML = last.map(p => {
+      const c     = getCuenta(p.cuenta_id);
+      const cat   = c ? getCat(c.categoria_id) : null;
+      const color = cat?.color ?? '#6b7280';
+      return `
+        <div class="list-item">
+          <div class="list-dot" style="background:${color}"></div>
+          <div class="list-info">
+            <span class="list-name">${c ? escHtml(c.nombre) : '—'}</span>
+            <span class="list-sub">
+              📅 ${formatDate(p.fecha_pago)} · ${escHtml(p.metodo_pago || '—')}
+              ${p.comprobante ? ` · Ref: ${escHtml(p.comprobante)}` : ''}
+            </span>
+          </div>
+          <div class="list-amount">${formatMoney(p.monto_pagado)}</div>
+          ${estadoBadge(p.estado)}
+        </div>`;
+    }).join('');
   }
 }
 
-let currentView = 'list';
-
-function setView(view) {
-  currentView = view;
-  const isList = view === 'list';
-  document.getElementById('billsList').style.display    = isList ? '' : 'none';
-  document.getElementById('calendarView').style.display = isList ? 'none' : '';
-  document.getElementById('btnViewList').classList.toggle('active',  isList);
-  document.getElementById('btnViewCal').classList.toggle('active',  !isList);
-  if (!isList) renderCalendar();
-}
-
-document.getElementById('btnViewList').addEventListener('click', () => setView('list'));
-document.getElementById('btnViewCal').addEventListener('click',  () => setView('cal'));
-document.getElementById('calPrev').addEventListener('click', () => {
-  calMonth--;
-  if (calMonth < 0) { calMonth = 11; calYear--; }
-  renderCalendar();
-});
-document.getElementById('calNext').addEventListener('click', () => {
-  calMonth++;
-  if (calMonth > 11) { calMonth = 0; calYear++; }
-  renderCalendar();
+document.getElementById('upcomingList').addEventListener('click', e => {
+  const btn = e.target.closest('[data-pay-cuenta]');
+  if (btn) openPagoModal(null, btn.dataset.payCuenta);
 });
 
-// ─── Events ───────────────────────────────────────────────────────────────────
+// ─── Cuentas ──────────────────────────────────────────────────────────────────
 
-document.getElementById('btnAdd').addEventListener('click', () => openModal());
-document.getElementById('modalClose').addEventListener('click', closeModal);
-document.getElementById('btnCancel').addEventListener('click', closeModal);
-document.getElementById('billForm').addEventListener('submit', saveBill);
+function renderCuentas() {
+  const search    = document.getElementById('searchCuentas').value.toLowerCase();
+  const showInact = document.getElementById('showInactive').checked;
 
-document.getElementById('modalOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modalOverlay')) closeModal();
-});
+  const list = cuentas.filter(c => {
+    if (!showInact && !c.activa) return false;
+    if (search && !c.nombre.toLowerCase().includes(search)) return false;
+    return true;
+  }).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-document.getElementById('billsList').addEventListener('click', e => {
+  const el = document.getElementById('cuentasList');
+  if (list.length === 0) {
+    el.innerHTML = emptyState('🗂️', 'No hay cuentas.', 'Haz clic en "Nueva Cuenta" para comenzar.');
+    return;
+  }
+
+  el.innerHTML = list.map(c => {
+    const cat       = getCat(c.categoria_id);
+    const color     = cat?.color ?? '#6b7280';
+    const lastPago  = pagos
+      .filter(p => p.cuenta_id === c.id)
+      .sort((a, b) => (b.fecha_pago || '').localeCompare(a.fecha_pago || ''))[0];
+
+    return `
+      <div class="list-item${c.activa ? '' : ' inactive'}">
+        <div class="list-dot" style="background:${color}"></div>
+        <div class="list-info">
+          <span class="list-name">
+            ${escHtml(c.nombre)}
+            ${!c.activa ? '<span class="badge-tag">Inactiva</span>' : ''}
+          </span>
+          <span class="list-sub">
+            ${cat ? escHtml(cat.nombre) : 'Sin categoría'} ·
+            Día ${c.dia_vencimiento ?? '?'} · ${c.frecuencia}
+            ${lastPago ? ` · Último pago: ${formatDate(lastPago.fecha_pago)}` : ''}
+          </span>
+          ${c.notas ? `<span class="list-sub">📝 ${escHtml(c.notas)}</span>` : ''}
+        </div>
+        <div class="list-amount">${formatMoney(c.monto_estimado)}</div>
+        <div class="list-actions">
+          <button class="btn-sm" data-pay-cuenta="${c.id}">+ Pago</button>
+          <button class="btn-icon btn-edit-cuenta" data-id="${c.id}" title="Editar">✏️</button>
+          <button class="btn-icon btn-del-cuenta"  data-id="${c.id}" title="Eliminar">🗑️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('searchCuentas').addEventListener('input', renderCuentas);
+document.getElementById('showInactive').addEventListener('change', renderCuentas);
+
+document.getElementById('cuentasList').addEventListener('click', e => {
   const btn = e.target.closest('button');
   if (!btn) return;
   const id = btn.dataset.id;
-  if (btn.classList.contains('btn-pay'))  togglePaid(id);
-  if (btn.classList.contains('btn-edit')) openModal(bills.find(b => b.id === id));
-  if (btn.classList.contains('btn-del'))  deleteBill(id);
+  if (btn.dataset.payCuenta)                    openPagoModal(null, btn.dataset.payCuenta);
+  if (btn.classList.contains('btn-edit-cuenta')) openCuentaModal(getCuenta(id));
+  if (btn.classList.contains('btn-del-cuenta')) {
+    if (!confirm('¿Eliminar esta cuenta? También se eliminarán sus pagos.')) return;
+    cuentas = cuentas.filter(c => c.id !== id);
+    pagos   = pagos.filter(p => p.cuenta_id !== id);
+    saveAll();
+    renderCuentas();
+  }
 });
+
+// ─── Pagos ────────────────────────────────────────────────────────────────────
+
+function renderPagos() {
+  const month = document.getElementById('filterMonth').value;
+
+  const list = pagos.filter(p => {
+    if (pagosFilter !== 'all' && p.estado !== pagosFilter) return false;
+    if (month && !p.fecha_pago?.startsWith(month)) return false;
+    return true;
+  }).sort((a, b) => (b.fecha_pago || '').localeCompare(a.fecha_pago || ''));
+
+  const el = document.getElementById('pagosList');
+  if (list.length === 0) {
+    el.innerHTML = emptyState('💰', 'No hay pagos registrados.', 'Haz clic en "Nuevo Pago" para registrar uno.');
+    return;
+  }
+
+  el.innerHTML = list.map(p => {
+    const c     = getCuenta(p.cuenta_id);
+    const cat   = c ? getCat(c.categoria_id) : null;
+    const color = cat?.color ?? '#6b7280';
+    return `
+      <div class="list-item">
+        <div class="list-dot" style="background:${color}"></div>
+        <div class="list-info">
+          <span class="list-name">${c ? escHtml(c.nombre) : '—'}</span>
+          <span class="list-sub">
+            📅 ${formatDate(p.fecha_pago)}
+            ${p.fecha_vence ? ` · Vence: ${formatDate(p.fecha_vence)}` : ''}
+            · ${escHtml(p.metodo_pago || '—')}
+            ${p.comprobante ? ` · Ref: ${escHtml(p.comprobante)}` : ''}
+          </span>
+          ${p.notas ? `<span class="list-sub">📝 ${escHtml(p.notas)}</span>` : ''}
+        </div>
+        <div class="list-amount">${formatMoney(p.monto_pagado)}</div>
+        <div class="list-actions">
+          ${estadoBadge(p.estado)}
+          <button class="btn-icon btn-edit-pago" data-id="${p.id}" title="Editar">✏️</button>
+          <button class="btn-icon btn-del-pago"  data-id="${p.id}" title="Eliminar">🗑️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('filterMonth').addEventListener('change', renderPagos);
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentFilter = btn.dataset.filter;
-    renderBills();
+    pagosFilter = btn.dataset.filter;
+    renderPagos();
+  });
+});
+
+document.getElementById('pagosList').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.classList.contains('btn-edit-pago')) openPagoModal(pagos.find(p => p.id === id));
+  if (btn.classList.contains('btn-del-pago')) {
+    if (!confirm('¿Eliminar este pago?')) return;
+    pagos = pagos.filter(p => p.id !== id);
+    saveAll();
+    renderPagos();
+  }
+});
+
+// ─── Categorías ───────────────────────────────────────────────────────────────
+
+function renderCategorias() {
+  const el = document.getElementById('catGrid');
+  if (cats.length === 0) {
+    el.innerHTML = emptyState('🏷️', 'No hay categorías.', '');
+    return;
+  }
+  el.innerHTML = cats.map(c => {
+    const count = cuentas.filter(cu => cu.categoria_id === c.id).length;
+    return `
+      <div class="cat-card">
+        <div class="cat-color-bar" style="background:${c.color}"></div>
+        <div class="cat-info">
+          <div class="cat-nombre">${escHtml(c.nombre)}</div>
+          ${c.descripcion ? `<div class="cat-desc">${escHtml(c.descripcion)}</div>` : ''}
+          <div class="cat-count">${count} cuenta${count !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="cat-actions">
+          <button class="btn-icon btn-edit-cat" data-id="${c.id}" title="Editar">✏️</button>
+          <button class="btn-icon btn-del-cat"  data-id="${c.id}" title="Eliminar">🗑️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('catGrid').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.classList.contains('btn-edit-cat')) openCatModal(getCat(id));
+  if (btn.classList.contains('btn-del-cat')) {
+    if (!confirm('¿Eliminar esta categoría?')) return;
+    cats = cats.filter(c => c.id !== id);
+    cuentas.forEach(c => { if (c.categoria_id === id) c.categoria_id = null; });
+    saveAll();
+    renderCategorias();
+  }
+});
+
+// ─── Modal helpers ────────────────────────────────────────────────────────────
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+document.querySelectorAll('[data-close]').forEach(btn => {
+  btn.addEventListener('click', () => closeModal(btn.dataset.close));
+});
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) closeModal(overlay.id);
   });
 });
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Escape') ['modalCuenta', 'modalPago', 'modalCat'].forEach(closeModal);
 });
 
-// ─── ICS Export ───────────────────────────────────────────────────────────────
+// ─── Cuenta modal ─────────────────────────────────────────────────────────────
 
-function exportICS() {
-  const unpaid = bills.filter(b => !b.paid);
-  if (unpaid.length === 0) {
-    alert('No hay cuentas pendientes para exportar.');
-    return;
-  }
-
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Cuentas por Pagar//ES',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-  ];
-
-  unpaid.forEach(bill => {
-    const [y, m, d] = bill.dueDate.split('-');
-    const dtDate = `${y}${m}${d}`;
-
-    // Next day for DTEND
-    const due = new Date(bill.dueDate + 'T00:00:00');
-    due.setDate(due.getDate() + 1);
-    const endDate = `${due.getFullYear()}${String(due.getMonth()+1).padStart(2,'0')}${String(due.getDate()).padStart(2,'0')}`;
-
-    const uid = `bill-${bill.id}@cuentas`;
-    const summary  = bill.name.replace(/[,;\\]/g, ' ');
-    const desc = `Monto: ${formatAmount(bill.amount, bill.currency)}${bill.notes ? ' | ' + bill.notes.replace(/[,;\\]/g, ' ') : ''}`;
-
-    lines.push(
-      'BEGIN:VEVENT',
-      `UID:${uid}`,
-      `DTSTAMP:${dtDate}T000000Z`,
-      `DTSTART;VALUE=DATE:${dtDate}`,
-      `DTEND;VALUE=DATE:${endDate}`,
-      `SUMMARY:💳 ${summary}`,
-      `DESCRIPTION:${desc}`,
-      'BEGIN:VALARM',
-      'TRIGGER:-P3D',
-      'ACTION:DISPLAY',
-      `DESCRIPTION:Vence en 3 días: ${summary}`,
-      'END:VALARM',
-      'END:VEVENT',
-    );
-  });
-
-  lines.push('END:VCALENDAR');
-
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'cuentas-por-pagar.ics';
-  a.click();
-  URL.revokeObjectURL(url);
+function buildCatOptions(selectedId = '') {
+  document.getElementById('cuentaCategoria').innerHTML =
+    '<option value="">Sin categoría</option>' +
+    cats.map(c =>
+      `<option value="${c.id}"${c.id === selectedId ? ' selected' : ''}>${escHtml(c.nombre)}</option>`
+    ).join('');
 }
 
-document.getElementById('btnExportICS').addEventListener('click', exportICS);
+function openCuentaModal(cuenta = null) {
+  editingCuentaId = cuenta?.id ?? null;
+  document.getElementById('modalCuentaTitle').textContent = cuenta ? 'Editar Cuenta' : 'Nueva Cuenta';
+  document.getElementById('cuentaId').value         = cuenta?.id ?? '';
+  document.getElementById('cuentaNombre').value     = cuenta?.nombre ?? '';
+  document.getElementById('cuentaMonto').value      = cuenta?.monto_estimado ?? '';
+  document.getElementById('cuentaDia').value        = cuenta?.dia_vencimiento ?? '';
+  document.getElementById('cuentaFrecuencia').value = cuenta?.frecuencia ?? 'mensual';
+  document.getElementById('cuentaNotas').value      = cuenta?.notas ?? '';
+  document.getElementById('cuentaActiva').checked   = cuenta ? cuenta.activa : true;
+  buildCatOptions(cuenta?.categoria_id ?? '');
+  openModal('modalCuenta');
+  document.getElementById('cuentaNombre').focus();
+}
+
+document.getElementById('btnNewCuenta').addEventListener('click', () => openCuentaModal());
+
+document.getElementById('formCuenta').addEventListener('submit', e => {
+  e.preventDefault();
+  const obj = {
+    id:              editingCuentaId ?? uid(),
+    nombre:          document.getElementById('cuentaNombre').value.trim(),
+    categoria_id:    document.getElementById('cuentaCategoria').value || null,
+    monto_estimado:  parseFloat(document.getElementById('cuentaMonto').value) || 0,
+    dia_vencimiento: parseInt(document.getElementById('cuentaDia').value) || null,
+    frecuencia:      document.getElementById('cuentaFrecuencia').value,
+    activa:          document.getElementById('cuentaActiva').checked,
+    notas:           document.getElementById('cuentaNotas').value.trim(),
+    creado_en:       editingCuentaId
+      ? (getCuenta(editingCuentaId)?.creado_en ?? new Date().toISOString())
+      : new Date().toISOString(),
+  };
+
+  if (editingCuentaId) {
+    const idx = cuentas.findIndex(c => c.id === editingCuentaId);
+    if (idx !== -1) cuentas[idx] = obj;
+  } else {
+    cuentas.push(obj);
+  }
+
+  saveAll();
+  closeModal('modalCuenta');
+  renderTab(currentTab);
+});
+
+// ─── Pago modal ───────────────────────────────────────────────────────────────
+
+function buildCuentaOptions(selectedId = '') {
+  const all = cuentas.filter(c => c.activa || c.id === selectedId);
+  document.getElementById('pagoCuenta').innerHTML =
+    all.map(c =>
+      `<option value="${c.id}"${c.id === selectedId ? ' selected' : ''}>${escHtml(c.nombre)}</option>`
+    ).join('');
+}
+
+function openPagoModal(pago = null, prefillCuentaId = null) {
+  editingPagoId = pago?.id ?? null;
+  document.getElementById('modalPagoTitle').textContent  = pago ? 'Editar Pago' : 'Nuevo Pago';
+  document.getElementById('pagoId').value          = pago?.id ?? '';
+  document.getElementById('pagoMonto').value       = pago?.monto_pagado ?? '';
+  document.getElementById('pagoFecha').value       = pago?.fecha_pago ?? today();
+  document.getElementById('pagoVence').value       = pago?.fecha_vence ?? '';
+  document.getElementById('pagoMetodo').value      = pago?.metodo_pago ?? 'transferencia';
+  document.getElementById('pagoComprobante').value = pago?.comprobante ?? '';
+  document.getElementById('pagoEstado').value      = pago?.estado ?? 'pagado';
+  document.getElementById('pagoNotas').value       = pago?.notas ?? '';
+  buildCuentaOptions(pago?.cuenta_id ?? prefillCuentaId ?? '');
+  openModal('modalPago');
+  document.getElementById('pagoMonto').focus();
+}
+
+document.getElementById('btnNewPago').addEventListener('click', () => openPagoModal());
+
+document.getElementById('formPago').addEventListener('submit', e => {
+  e.preventDefault();
+  const obj = {
+    id:           editingPagoId ?? uid(),
+    cuenta_id:    document.getElementById('pagoCuenta').value,
+    monto_pagado: parseFloat(document.getElementById('pagoMonto').value) || 0,
+    fecha_pago:   document.getElementById('pagoFecha').value,
+    fecha_vence:  document.getElementById('pagoVence').value || null,
+    metodo_pago:  document.getElementById('pagoMetodo').value,
+    comprobante:  document.getElementById('pagoComprobante').value.trim(),
+    estado:       document.getElementById('pagoEstado').value,
+    notas:        document.getElementById('pagoNotas').value.trim(),
+    creado_en:    editingPagoId
+      ? (pagos.find(p => p.id === editingPagoId)?.creado_en ?? new Date().toISOString())
+      : new Date().toISOString(),
+  };
+
+  if (editingPagoId) {
+    const idx = pagos.findIndex(p => p.id === editingPagoId);
+    if (idx !== -1) pagos[idx] = obj;
+  } else {
+    pagos.push(obj);
+  }
+
+  saveAll();
+  closeModal('modalPago');
+  renderTab(currentTab);
+});
+
+// ─── Categoría modal ──────────────────────────────────────────────────────────
+
+function buildSwatches() {
+  document.getElementById('colorSwatches').innerHTML =
+    COLOR_SWATCHES.map(c =>
+      `<div class="swatch" style="background:${c}" data-color="${c}" title="${c}"></div>`
+    ).join('');
+}
+
+function openCatModal(cat = null) {
+  editingCatId = cat?.id ?? null;
+  document.getElementById('modalCatTitle').textContent = cat ? 'Editar Categoría' : 'Nueva Categoría';
+  document.getElementById('catId').value     = cat?.id ?? '';
+  document.getElementById('catNombre').value = cat?.nombre ?? '';
+  document.getElementById('catDesc').value   = cat?.descripcion ?? '';
+  document.getElementById('catColor').value  = cat?.color ?? '#3b82f6';
+  buildSwatches();
+  openModal('modalCat');
+  document.getElementById('catNombre').focus();
+}
+
+document.getElementById('colorSwatches').addEventListener('click', e => {
+  const sw = e.target.closest('.swatch');
+  if (sw) document.getElementById('catColor').value = sw.dataset.color;
+});
+
+document.getElementById('btnNewCat').addEventListener('click', () => openCatModal());
+
+document.getElementById('formCat').addEventListener('submit', e => {
+  e.preventDefault();
+  const obj = {
+    id:          editingCatId ?? uid(),
+    nombre:      document.getElementById('catNombre').value.trim(),
+    descripcion: document.getElementById('catDesc').value.trim(),
+    color:       document.getElementById('catColor').value,
+    creado_en:   editingCatId
+      ? (getCat(editingCatId)?.creado_en ?? new Date().toISOString())
+      : new Date().toISOString(),
+  };
+
+  if (editingCatId) {
+    const idx = cats.findIndex(c => c.id === editingCatId);
+    if (idx !== -1) cats[idx] = obj;
+  } else {
+    cats.push(obj);
+  }
+
+  saveAll();
+  closeModal('modalCat');
+  renderCategorias();
+});
+
+// ─── Empty state helper ───────────────────────────────────────────────────────
+
+function emptyState(icon, line1, line2 = '') {
+  return `<div class="empty-state">
+    <div class="empty-icon">${icon}</div>
+    <p>${line1}</p>
+    ${line2 ? `<p>${line2}</p>` : ''}
+  </div>`;
+}
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
-load();
-renderBills();
+loadAll();
+document.getElementById('filterMonth').value = currentMonth();
+renderTab('resumen');
 
 if (!sessionStorage.getItem(AUTH_KEY)) {
   showLockScreen();
